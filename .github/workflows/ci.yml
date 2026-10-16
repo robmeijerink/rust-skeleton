@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Installs the toolchain from rust-toolchain.toml, caches builds and sets RUSTFLAGS="-D warnings"
       - name: Setup Rust
