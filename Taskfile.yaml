@@ -5,11 +5,11 @@ includes:
     taskfile: Taskfile.local.yml
     optional: true
 
-# Unique Compose project per checkout (matches the name VS Code Dev Containers uses)
 vars:
   COMPOSE: docker compose -f .devcontainer/docker-compose.yml
   CARGO: "{{.COMPOSE}} run --rm app cargo"
 
+# Unique Compose project per checkout (matches the name VS Code Dev Containers uses)
 env:
   COMPOSE_PROJECT_NAME: '{{regexReplaceAll "[^a-z0-9_-]" (lower (base .ROOT_DIR)) ""}}_devcontainer'
 
@@ -35,14 +35,25 @@ tasks:
           task "$TASK_NAME"
         fi
 
+  volumes:
+    desc: Create the toolchain and crate cache volumes shared by all projects
+    internal: true
+    silent: true
+    run: once
+    cmds:
+      - docker volume create rust_cargo > /dev/null
+      - docker volume create rust_rustup > /dev/null
+
   init:
     desc: Rename the project (task init -- my-project)
+    deps: [volumes]
     cmds:
       - |
         NAME="{{.CLI_ARGS}}"
         if [ -z "$NAME" ]; then echo "Usage: task init -- <project-name>"; exit 1; fi
-        for f in Cargo.toml src/main.rs .devcontainer/devcontainer.json; do
-          sed -i.bak "s/rust-skeleton/$NAME/g" "$f" && rm "$f.bak"
+        SNAKE=$(echo "$NAME" | tr '-' '_')
+        for f in Cargo.toml src/main.rs src/lib.rs .devcontainer/devcontainer.json; do
+          sed -i.bak "s/rust-skeleton/$NAME/g; s/rust_skeleton/$SNAKE/g" "$f" && rm "$f.bak"
         done
         {{.CARGO}} check --quiet
         echo "Renamed project to: $NAME"
@@ -52,46 +63,51 @@ tasks:
   # ==========================================
   dev:
     desc: Start the app and restart on file changes (via Docker Compose)
+    deps: [volumes]
     cmds:
       - "{{.COMPOSE}} up"
 
   run:
     desc: Run the app once (task run -- <args>)
+    deps: [volumes]
     cmds:
       - "{{.CARGO}} run -- {{.CLI_ARGS}}"
 
   test:
     desc: Run project tests
+    deps: [volumes]
     cmds:
       - "{{.CARGO}} test"
 
   check:
-    desc: Run all CI checks (format, lint, test)
+    desc: Format the code, then lint and test
+    silent: true
+    # One container and quiet output: this is the feedback loop for AI agents, every line costs tokens.
+    # Formats instead of only checking, so agents never spend a round trip on formatting (CI still checks).
+    deps: [volumes]
     cmds:
-      - "{{.CARGO}} fmt --all --check"
-      - "{{.CARGO}} clippy --all-targets -- -D warnings"
-      - "{{.CARGO}} test"
+      - "{{.COMPOSE}} --progress quiet run --rm app sh -c 'cargo fmt --all && cargo clippy -q --locked --all-targets -- -D warnings && cargo test -q --locked'"
 
   fmt:
     desc: Format the code
+    deps: [volumes]
     cmds:
       - "{{.CARGO}} fmt --all"
 
   cargo:
     desc: Run any cargo command (task cargo -- add serde --features derive)
+    deps: [volumes]
     cmds:
       - "{{.CARGO}} {{.CLI_ARGS}}"
 
   build:
     desc: Build the production Docker image
     cmds:
-      - docker build -t {{.IMAGE}} .
-    vars:
-      IMAGE:
-        sh: basename "$PWD" | tr '[:upper:]' '[:lower:]'
+      - docker build -t {{regexReplaceAll "[^a-z0-9_.-]" (lower (base .ROOT_DIR)) ""}} .
 
   clean:
     desc: Remove build artifacts and shut down containers
+    deps: [volumes]
     cmds:
       - "{{.CARGO}} clean"
       - "{{.COMPOSE}} down"

@@ -27,3 +27,15 @@ jobs:
 
       - name: Run Tests
         run: cargo test --locked
+
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      # Catches crates that build in the dev container but not in the slim production image
+      - name: Build Image
+        run: docker build .

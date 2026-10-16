@@ -11,8 +11,12 @@ unsafe_code = "forbid"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
+# Guardrails for AI agents: enforced by the compiler instead of written instructions
+unwrap_used = "warn"
+expect_used = "warn"
+allow_attributes_without_reason = "warn"
 
 [profile.release]
 lto = "thin"
 codegen-units = 1
-strip = true
+strip = "debuginfo"

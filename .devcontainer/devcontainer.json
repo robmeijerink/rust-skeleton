@@ -2,6 +2,7 @@
   "name": "rust-skeleton",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
+  "initializeCommand": "docker volume create rust_cargo && docker volume create rust_rustup",
   "workspaceFolder": "/app",
   "forwardPorts": [8080],
   "customizations": {

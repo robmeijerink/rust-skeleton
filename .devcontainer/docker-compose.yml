@@ -2,21 +2,30 @@ services:
   app:
     image: rust:1-trixie
     working_dir: /app
+    # Forward signals to the app so `docker compose stop` is instant instead of a 10s SIGKILL
+    init: true
     volumes:
       - ../:/app
-      # Cache toolchain, crates and build output (also much faster than a bind mount on macOS)
+      # Toolchain and crate cache are shared by all projects (like a local ~/.cargo and ~/.rustup)
       - cargo:/usr/local/cargo
       - rustup:/usr/local/rustup
+      # Build output stays per project (also much faster than a bind mount on macOS)
       - target:/app/target
     # Install watchexec on-the-fly (cached after first time) and restart the app on changes.
     # Polling: file events don't reliably cross bind mounts on macOS. Add -w <dir> for extra source dirs.
     command: sh -c "cargo install --locked watchexec-cli@2.8.0 && watchexec -r --poll 500ms -w src -w Cargo.toml -- cargo run"
+    # Bound to localhost only; the app itself must listen on 0.0.0.0 inside the container
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
 
   # Add local infrastructure (databases, queues, ...) here.
 
 volumes:
+  # Created by `task` and the Dev Container's initializeCommand
   cargo:
+    name: rust_cargo
+    external: true
   rustup:
+    name: rust_rustup
+    external: true
   target:

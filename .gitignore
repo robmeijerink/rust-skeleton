@@ -3,7 +3,9 @@
 
 # Environment variables
 .env
+.env.*
 *.env
+!.env.example
 
 # IDE and editor files
 .idea/
@@ -11,3 +13,7 @@
 *.swp
 *.swo
 .DS_Store
+
+# Personal AI agent settings
+.claude/settings.local.json
+CLAUDE.local.md

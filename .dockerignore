@@ -3,7 +3,9 @@ target/
 
 # Environment variables
 .env
+.env.*
 *.env
+!.env.example
 
 # Version control
 .git/
@@ -20,3 +22,9 @@ target/
 .devcontainer/
 .github/
 README.md
+docs/
+
+# AI agent config
+.claude/
+AGENTS.md
+CLAUDE.md
