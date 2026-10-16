@@ -1,0 +1,22 @@
+services:
+  app:
+    image: rust:1-trixie
+    working_dir: /app
+    volumes:
+      - ../:/app
+      # Cache toolchain, crates and build output (also much faster than a bind mount on macOS)
+      - cargo:/usr/local/cargo
+      - rustup:/usr/local/rustup
+      - target:/app/target
+    # Install watchexec on-the-fly (cached after first time) and restart the app on changes.
+    # Polling: file events don't reliably cross bind mounts on macOS. Add -w <dir> for extra source dirs.
+    command: sh -c "cargo install --locked watchexec-cli@2.8.0 && watchexec -r --poll 500ms -w src -w Cargo.toml -- cargo run"
+    ports:
+      - "8080:8080"
+
+  # Add local infrastructure (databases, queues, ...) here.
+
+volumes:
+  cargo:
+  rustup:
+  target:

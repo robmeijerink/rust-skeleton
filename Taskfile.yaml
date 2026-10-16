@@ -1,0 +1,97 @@
+version: "3"
+
+includes:
+  local:
+    taskfile: Taskfile.local.yml
+    optional: true
+
+# Unique Compose project per checkout (matches the name VS Code Dev Containers uses)
+vars:
+  COMPOSE: docker compose -f .devcontainer/docker-compose.yml
+  CARGO: "{{.COMPOSE}} run --rm app cargo"
+
+env:
+  COMPOSE_PROJECT_NAME: '{{regexReplaceAll "[^a-z0-9_-]" (lower (base .ROOT_DIR)) ""}}_devcontainer'
+
+tasks:
+  # ==========================================
+  # 💻 SYSTEM
+  # ==========================================
+  default:
+    desc: Open search window task
+    silent: true
+    cmds:
+      - task: search
+
+  search:
+    desc: Open search window
+    silent: true
+    cmds:
+      - |
+        CHOICE=$(task --list | grep '^\*' | grep -vE 'default|search' | fzf --reverse --border="rounded" --prompt="🚀 Search Task: " --pointer="👉")
+        if [ -n "$CHOICE" ]; then
+          TASK_NAME=$(echo "$CHOICE" | awk '{print $2}' | sed 's/:$//')
+          echo -e "\033[1;32mRunning:\033[0m task $TASK_NAME\n"
+          task "$TASK_NAME"
+        fi
+
+  init:
+    desc: Rename the project (task init -- my-project)
+    cmds:
+      - |
+        NAME="{{.CLI_ARGS}}"
+        if [ -z "$NAME" ]; then echo "Usage: task init -- <project-name>"; exit 1; fi
+        for f in Cargo.toml src/main.rs .devcontainer/devcontainer.json; do
+          sed -i.bak "s/rust-skeleton/$NAME/g" "$f" && rm "$f.bak"
+        done
+        {{.CARGO}} check --quiet
+        echo "Renamed project to: $NAME"
+
+  # ==========================================
+  # 🚀 MAIN
+  # ==========================================
+  dev:
+    desc: Start the app and restart on file changes (via Docker Compose)
+    cmds:
+      - "{{.COMPOSE}} up"
+
+  run:
+    desc: Run the app once (task run -- <args>)
+    cmds:
+      - "{{.CARGO}} run -- {{.CLI_ARGS}}"
+
+  test:
+    desc: Run project tests
+    cmds:
+      - "{{.CARGO}} test"
+
+  check:
+    desc: Run all CI checks (format, lint, test)
+    cmds:
+      - "{{.CARGO}} fmt --all --check"
+      - "{{.CARGO}} clippy --all-targets -- -D warnings"
+      - "{{.CARGO}} test"
+
+  fmt:
+    desc: Format the code
+    cmds:
+      - "{{.CARGO}} fmt --all"
+
+  cargo:
+    desc: Run any cargo command (task cargo -- add serde --features derive)
+    cmds:
+      - "{{.CARGO}} {{.CLI_ARGS}}"
+
+  build:
+    desc: Build the production Docker image
+    cmds:
+      - docker build -t {{.IMAGE}} .
+    vars:
+      IMAGE:
+        sh: basename "$PWD" | tr '[:upper:]' '[:lower:]'
+
+  clean:
+    desc: Remove build artifacts and shut down containers
+    cmds:
+      - "{{.CARGO}} clean"
+      - "{{.COMPOSE}} down"

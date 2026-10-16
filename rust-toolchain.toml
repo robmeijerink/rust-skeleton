@@ -1,0 +1,5 @@
+# Single source of truth for the Rust version (local, Docker and CI).
+# Pinned exactly so the project still builds the same way years from now; bump deliberately.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]

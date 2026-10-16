@@ -1,0 +1,13 @@
+# Build output
+/target/
+
+# Environment variables
+.env
+*.env
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
