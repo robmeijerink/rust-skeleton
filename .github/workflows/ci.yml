@@ -15,7 +15,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v7
 
-      # Installs the toolchain from rust-toolchain.toml, caches builds and sets RUSTFLAGS="-D warnings"
+      # Installs the toolchain from rust-toolchain.toml, caches builds and denies warnings (CARGO_BUILD_WARNINGS)
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v2
 

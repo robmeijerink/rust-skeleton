@@ -7,7 +7,7 @@ use std::error::Error;
 /// # Errors
 ///
 /// Returns an error when the application fails; `main` reports it and exits non-zero.
-pub fn run() -> Result<(), Box<dyn Error>> {
+pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     println!("Hello from rust-skeleton!");
     Ok(())
 }

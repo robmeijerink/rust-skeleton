@@ -25,7 +25,7 @@ A minimalist, container-first boilerplate for building Rust software with agenti
 
 * **First run:** the first command downloads the toolchain and the first `task dev` compiles watchexec; this takes a few minutes once, then everything is cached in Docker volumes.
 * **Shared caches:** the toolchain and crate cache live in the Docker volumes `rust_cargo` and `rust_rustup`, shared by all projects (like a local `~/.cargo`). Reset them with `docker volume rm rust_cargo rust_rustup`; build output (`target/`) stays per project.
-* **Colima:** only your home directory is shared with the VM by default, so keep projects under `~`.
+* **File sharing:** the project must be in a directory Docker can access (Docker Desktop: *Settings → Resources → File sharing*; Colima: `mounts` in `colima.yaml`, default `~`). Otherwise the container sees an empty `/app` and cargo reports a missing `Cargo.toml`.
 * **Linux hosts:** files created inside the container (e.g. by `task fmt`) are owned by root.
 * **Ports:** `task dev` publishes port 8080 on localhost only; change it per project in `.devcontainer/docker-compose.yml` to avoid clashes.
 * **CPU architecture:** `task build` builds for your machine's architecture. For a server with another one, use `docker build --platform linux/amd64 .` (slow under emulation) or build in CI.
