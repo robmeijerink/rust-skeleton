@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Catches crates that build in the dev container but not in the slim production image
       - name: Build Image
