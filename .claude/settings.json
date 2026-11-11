@@ -14,9 +14,9 @@
       "Bash(cargo:*)",
       "Bash(rustc:*)",
       "Bash(task dev:*)",
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(./*.env)"
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/*.env)"
     ]
   }
 }

@@ -4,7 +4,6 @@
   "service": "app",
   "initializeCommand": "docker volume create rust_cargo && docker volume create rust_rustup",
   "workspaceFolder": "/app",
-  "forwardPorts": [8080],
   "customizations": {
     "vscode": {
       "extensions": ["rust-lang.rust-analyzer"]

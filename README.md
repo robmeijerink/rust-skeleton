@@ -74,9 +74,9 @@ Run `task` without any arguments to open the interactive `fzf` search menu, or r
 | `task fmt`            | Formats the code. |
 | <code>task&nbsp;cargo&nbsp;&#8209;&#8209;&nbsp;&lt;cmd&gt;</code> | Runs any cargo command (e.g., `task cargo -- add serde --features derive`). |
 | `task agent`          | Starts Claude Code in the isolated sandbox (pass arguments with `task agent -- <args>`). |
-| `task agent:update`   | Rebuilds the sandbox with the latest Claude Code and Node.js. |
+| `task agent:update`   | Rebuilds the sandbox with the latest Claude Code. |
 | `task build`          | Builds the production Docker image, tagged with the directory name. |
-| `task clean`          | Removes build artifacts and shuts down containers. |
+| `task clean`          | Removes build artifacts (app and sandbox) and shuts down containers. |
 
 Add machine-specific tasks to a `Taskfile.local.yml`; it is included automatically if it exists.
 
@@ -86,10 +86,11 @@ The setup keeps agents efficient (few tokens) and the codebase manageable as it 
 
 ### Isolated Agent Sandbox
 
-`task agent` runs Claude Code in a container that only sees this project (not your home directory, other projects or secrets), so you can safely let it work in auto mode. `.git`, `.claude/` and the Task/Compose files are read-only: the agent can't commit or push (`git status`, `git diff` and `git log` still work) and can't plant anything that would run on your machine. You review and commit yourself. Because `.claude/` is read-only, "always allow" choices can't be saved there; add them yourself. Inside the sandbox `task check` runs the same cargo commands directly. What it does and doesn't protect against is in [`docs/decisions/002-agent-sandbox.md`](docs/decisions/002-agent-sandbox.md); notably, internet access is open.
+`task agent` runs Claude Code in a container that only sees this project (no home directory, other projects or secrets), so you can let it work in auto mode. It can't commit, push or change files that run on your machine; you review and commit yourself. Its code does run once you use `task` or open the project in an editor with rust-analyzer, so review the changes first. Internet access is open. What the sandbox does and doesn't protect against, plus a quick check before opening the project: [`docs/decisions/002-agent-sandbox.md`](docs/decisions/002-agent-sandbox.md).
 
 * **First run:** log in once with `/login` (Claude Pro/Max). The login is kept in a Docker volume and survives restarts and rebuilds.
-* **Updates:** the image uses the latest Claude Code and Node.js LTS when it is built. Run `task agent:update` when Claude Code reports it is outdated.
+* **Updates:** the image gets the latest Claude Code when it is built and doesn't update itself. Run `task agent:update` now and then to get the latest version.
+* **Permissions:** `.claude/` is read-only in the sandbox, so "always allow" choices aren't saved; add them to `.claude/settings.json` yourself.
 * **Personal skills and instructions (optional):** two generic Docker volumes let you plug in your own material without it ever appearing in this repo. Both are shared by all projects, mounted read-only, and created empty by `task agent` if you don't use them.
 
   | Volume | Mounted at | For |

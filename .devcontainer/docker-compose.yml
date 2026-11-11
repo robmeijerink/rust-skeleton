@@ -23,6 +23,8 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile.dev-agent
+      args:
+        UID: ${AGENT_UID:-1000}
     # Only started by name (`task agent`), not by `task dev` or a plain `compose up`
     profiles: [agent]
     working_dir: /app
@@ -34,8 +36,8 @@ services:
     volumes:
       - ../:/app
       # The mounts below are read-only. Otherwise the agent could break out of the sandbox by editing
-      # files that later run on the host: git hooks, Taskfile, compose files and Claude Code hooks
-      # (.claude/). A read-only .git also stops the agent from committing; `git status`,
+      # files that the host later runs or reads: git hooks, Taskfile, compose files and Claude Code
+      # hooks (.claude/). A read-only .git also stops the agent from committing; `git status`,
       # `git diff` and `git log` still work.
       - ../.git:/app/.git:ro
       - ../Taskfile.yaml:/app/Taskfile.yaml:ro

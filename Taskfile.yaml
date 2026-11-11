@@ -14,6 +14,10 @@ vars:
 # Unique Compose project per checkout (matches the name VS Code Dev Containers uses)
 env:
   COMPOSE_PROJECT_NAME: '{{regexReplaceAll "[^a-z0-9_-]" (lower (base .ROOT_DIR)) ""}}_devcontainer'
+  # Sandbox user: your uid on Linux so it can write to the project; 1000 on macOS (bind mounts
+  # ignore it there, and a change would lock the existing agent volumes). Never root.
+  AGENT_UID:
+    sh: '[ "$(uname -s)" = Linux ] && [ "$(id -u)" != 0 ] && id -u || echo 1000'
 
 tasks:
   # ==========================================
@@ -53,6 +57,9 @@ tasks:
       - |
         NAME="{{.CLI_ARGS}}"
         if [ -z "$NAME" ]; then echo "Usage: task init -- <project-name>"; exit 1; fi
+        if ! echo "$NAME" | grep -Eq '^[a-z][a-z0-9_-]*$'; then
+          echo "Invalid name '$NAME': use lowercase letters, digits, - and _, starting with a letter"; exit 1
+        fi
         SNAKE=$(echo "$NAME" | tr '-' '_')
         for f in Cargo.toml src/main.rs src/lib.rs .devcontainer/devcontainer.json; do
           sed -i.bak "s/rust-skeleton/$NAME/g; s/rust_skeleton/$SNAKE/g" "$f" && rm "$f.bak"
@@ -77,8 +84,9 @@ tasks:
         if [ -z "$files" ]; then
           echo 'services: {}' > .devcontainer/.agent-masks.yml
         else
+          # One path per line (not word-split), quoted in the YAML, so names with spaces work too
           { echo 'services:'; echo '  agent:'; echo '    volumes:'
-            for f in $files; do echo "      - /dev/null:/app/${f#./}:ro"; done
+            echo "$files" | while IFS= read -r f; do echo "      - \"/dev/null:/app/${f#./}:ro\""; done
           } > .devcontainer/.agent-masks.yml
         fi
 
@@ -100,7 +108,7 @@ tasks:
       - "{{.AGENT}} exec agent claude {{.CLI_ARGS}}"
 
   agent:update:
-    desc: Rebuild the sandbox with the latest Claude Code and Node.js
+    desc: Rebuild the sandbox with the latest Claude Code
     deps: [agent:prepare, agent:masks]
     cmds:
       - "{{.AGENT}} build --pull --no-cache agent"
@@ -151,8 +159,12 @@ tasks:
       - docker build -t {{regexReplaceAll "[^a-z0-9_.-]" (lower (base .ROOT_DIR)) ""}} .
 
   clean:
-    desc: Remove build artifacts and shut down containers
-    deps: [volumes]
+    desc: Remove build artifacts (app and sandbox) and shut down containers
     cmds:
-      - "{{.CARGO}} clean"
       - "{{.COMPOSE}} --profile agent down"
+      # Build output lives in volumes (`cargo clean` can't remove a mount point); remove them after
+      # `down` so no container still uses them. Not `down --volumes`: that would also drop the login.
+      - |
+        for VOL in "${COMPOSE_PROJECT_NAME}_target" "${COMPOSE_PROJECT_NAME}_agent_target"; do
+          if docker volume inspect "$VOL" > /dev/null 2>&1; then docker volume rm "$VOL" > /dev/null; fi
+        done

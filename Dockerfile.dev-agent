@@ -1,18 +1,8 @@
 # syntax=docker/dockerfile:1
 
 # Sandbox for Claude Code (`task agent`); a dev tool, not part of the app.
-# Deliberately not pinned: `task agent:update` rebuilds it with the latest Claude Code and Node.js LTS.
+# Deliberately not pinned: `task agent:update` rebuilds it with the latest Claude Code.
 FROM rust:1-trixie
-
-# Install Node.js (latest LTS) via NodeSource; curl and gnupg are needed for its setup script
-RUN apt-get update && apt-get install -y \
-    curl \
-    gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN npm install -g @anthropic-ai/claude-code
 
 # The sandbox has no Docker, so `task` (as used in AGENTS.md and .claude/settings.json)
 # runs the same cargo commands directly. Keep in sync with the tasks in Taskfile.yaml.
@@ -34,10 +24,19 @@ EOF
 
 # Run as a non-root user (Claude Code refuses auto-approve modes as root). The volumes mounted
 # at these paths (see docker-compose.yml) inherit this ownership when they are first created.
-RUN useradd --create-home --uid 1000 agent \
+# UID is set by Taskfile.yaml (AGENT_UID): your own uid on Linux, so the agent can write to the project.
+ARG UID=1000
+RUN useradd --create-home --uid "$UID" agent \
     && mkdir -p /app/target /home/agent/.claude \
     && chown -R agent:agent /app /home/agent /usr/local/cargo /usr/local/rustup \
     && git config --system --add safe.directory /app
 USER agent
 ENV CLAUDE_CONFIG_DIR=/home/agent/.claude
+
+# Native installer (npm installs are deprecated); it installs into ~/.local for the agent user.
+# Auto-updates are off: they would be lost when the container is recreated. Use `task agent:update`.
+RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH=/home/agent/.local/bin:$PATH \
+    DISABLE_AUTOUPDATER=1
+
 WORKDIR /app
