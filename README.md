@@ -19,14 +19,14 @@ A minimalist, container-first boilerplate for building Rust software with agenti
 | :--- | :--- |
 | [Docker](https://docs.docker.com/get-docker/) with Compose and [Buildx](https://github.com/docker/buildx) | Required (Docker Desktop includes both; on Colima: `brew install docker-buildx`) |
 | [Task](https://taskfile.dev/installation/) | Required |
-| [fzf](https://github.com/junegunn/fzf) | Optional (Required for the interactive Task menu) |
+| [fzf](https://github.com/junegunn/fzf) | Optional (needed for the interactive Task menu) |
 
 *Note: A local Rust installation is strictly optional. If you have [rustup](https://rustup.rs/), it picks up the same pinned version automatically.*
 
 * **First run:** the first command downloads the toolchain and the first `task dev` compiles watchexec; this takes a few minutes once, then everything is cached in Docker volumes.
 * **Shared caches:** the toolchain and crate cache live in the Docker volumes `rust_cargo` and `rust_rustup`, shared by all projects (like a local `~/.cargo`). Reset them with `docker volume rm rust_cargo rust_rustup`; build output (`target/`) stays per project.
 * **File sharing:** the project must be in a directory Docker can access (Docker Desktop: *Settings → Resources → File sharing*; Colima: `mounts` in `colima.yaml`, default `~`). Otherwise the container sees an empty `/app` and cargo reports a missing `Cargo.toml`.
-* **Linux hosts:** files created inside the container (e.g. by `task fmt`) are owned by root.
+* **Linux hosts:** new files that cargo creates inside the container (e.g. via `task cargo -- …`) are owned by root.
 * **Ports:** `task dev` publishes port 8080 on localhost only; change it per project in `.devcontainer/docker-compose.yml` to avoid clashes.
 * **CPU architecture:** `task build` builds for your machine's architecture. For a server with another one, use `docker build --platform linux/amd64 .` (slow under emulation) or build in CI.
 
@@ -70,7 +70,7 @@ Run `task` without any arguments to open the interactive `fzf` search menu, or r
 | `task dev`            | Starts the app via Docker Compose and restarts it on every file change. |
 | `task run`            | Runs the app once (pass arguments with `task run -- <args>`). |
 | `task test`           | Executes the test suite. |
-| `task check`          | Formats the code, then runs Clippy and tests (CI checks the same, without formatting). |
+| `task check`          | Formats the code, then runs Clippy and tests (CI runs the same checks, but only verifies formatting). |
 | `task fmt`            | Formats the code. |
 | <code>task&nbsp;cargo&nbsp;&#8209;&#8209;&nbsp;&lt;cmd&gt;</code> | Runs any cargo command (e.g., `task cargo -- add serde --features derive`). |
 | `task agent`          | Starts Claude Code in the isolated sandbox (pass arguments with `task agent -- <args>`). |
@@ -86,7 +86,7 @@ The setup keeps agents efficient (few tokens) and the codebase manageable as it 
 
 ### Isolated Agent Sandbox
 
-`task agent` runs Claude Code in a container that only sees this project (not your home directory, other projects or secrets), so you can safely let it work in auto mode. `.git`, `.claude/` and the Task/Compose files are read-only: the agent can't commit or push (`git status` and `git diff` work) and can't plant anything that would run on your machine, you review and commit yourself. Because `.claude/` is read-only, "always allow" choices can't be saved there; add them yourself. Inside the sandbox `task check` runs the same cargo commands directly. What it does and doesn't protect against is in [`docs/decisions/002-agent-sandbox.md`](docs/decisions/002-agent-sandbox.md); notably, internet access is open.
+`task agent` runs Claude Code in a container that only sees this project (not your home directory, other projects or secrets), so you can safely let it work in auto mode. `.git`, `.claude/` and the Task/Compose files are read-only: the agent can't commit or push (`git status`, `git diff` and `git log` still work) and can't plant anything that would run on your machine. You review and commit yourself. Because `.claude/` is read-only, "always allow" choices can't be saved there; add them yourself. Inside the sandbox `task check` runs the same cargo commands directly. What it does and doesn't protect against is in [`docs/decisions/002-agent-sandbox.md`](docs/decisions/002-agent-sandbox.md); notably, internet access is open.
 
 * **First run:** log in once with `/login` (Claude Pro/Max). The login is kept in a Docker volume and survives restarts and rebuilds.
 * **Updates:** the image uses the latest Claude Code and Node.js LTS when it is built. Run `task agent:update` when Claude Code reports it is outdated.
@@ -108,7 +108,7 @@ The setup keeps agents efficient (few tokens) and the codebase manageable as it 
 
   This can be a folder in your notes app (e.g. Obsidian), so you keep editing it there. Use a dedicated folder, not your whole vault: the agent can read everything you mount and, with the open network, send it out (see the ADR). Changes to the files show up in the sandbox immediately. To change where a volume points, `docker volume rm` it and create it again.
 
-  Instructions aren't loaded automatically. Put a `CLAUDE.md` in your instructions folder that `@`-imports the other files. Then, once, in the sandbox (in Claude Code, start with `!` to run a shell command), run the line below. It is remembered in the login volume:
+  Instructions aren't loaded automatically. Put a `CLAUDE.md` in your instructions folder that `@`-imports the other files. Then run the line below once in the sandbox (in Claude Code, prefix it with `!` to run it as a shell command). It is stored in the login volume:
 
   ```sh
   echo "@/opt/ai-instructions/CLAUDE.md" > ~/.claude/CLAUDE.md

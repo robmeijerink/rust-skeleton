@@ -1,11 +1,11 @@
 # 002: Agent Sandbox
 
-`task agent` runs Claude Code in a container, so an agent (also in auto-approve mode) can only reach this project and not the rest of the machine.
+`task agent` runs Claude Code in a container, so an agent (even in auto-approve mode) can only reach this project and not the rest of the machine.
 
 ## What the Sandbox Guarantees
 * **Only the project is mounted.** No home directory, no Docker socket, no host `~/.claude`.
 * **Secrets stay out:** `task agent` masks every `.env`, `.env.*` and `*.env` file (also in subfolders, not `.env.example`) with `/dev/null`. It lists the files that exist at start, and only those, because mounting over a missing file would make Docker create an empty one in the project. A secret file created while the sandbox runs is masked after the next `task agent`. Other names (e.g. `secrets.json`) are not masked; keep secrets in `.env` files.
-* **Nothing the agent writes runs on the host.** `.git`, `Taskfile.yaml`, `Taskfile.local.yml`, `.devcontainer/` and `.claude/` are mounted read-only. Otherwise a git hook, a task, a compose change or a Claude Code hook could execute outside the sandbox, on the host. A side effect is that the agent can't commit; `git status`, `git diff` and `git log` work. You review and commit yourself.
+* **Nothing the agent writes runs on the host.** `.git`, `Taskfile.yaml`, `Taskfile.local.yml`, `.devcontainer/` and `.claude/` are mounted read-only. Otherwise a git hook, a task, a compose change or a Claude Code hook could execute outside the sandbox, on the host. A side effect is that the agent can't commit; `git status`, `git diff` and `git log` still work. You review and commit yourself.
 * **Own volumes** (`agent_cargo`, `agent_rustup`, `agent_target`, `agent_claude`), not the `rust_*` ones the app uses. The agent can't plant a binary in a toolchain shared with other projects.
 * **Hardened container:** non-root user, all capabilities dropped, `no-new-privileges`, a process limit.
 * **No credentials for git remotes**, so the agent can't push.
@@ -15,7 +15,7 @@
 * **Other host-executed files** that this record doesn't list (for example a new `.mcp.json` or editor config) are writable. Check `git status` after an agent session, before running `claude` or `task` on the host.
 
 ## Login
-A Claude Pro/Max account has no API key. Log in once with `/login` in the sandbox; the token lives in the `agent_claude` volume. It never appears in the repo, compose file or Taskfile. A leaked token can use up your usage limits but is not tied to a payment method (keep extra usage off). Revoke it by logging out in your account settings.
+A Claude Pro/Max account has no API key. Log in once with `/login` in the sandbox; the token lives in the `agent_claude` volume. It never appears in the repo, compose file or Taskfile. A leaked token can use up your usage limits; with extra usage turned off, it can't cost you money. Revoke it by logging out in your account settings.
 
 ## Personal Skills and Instructions
 The repo only knows two generic, empty-by-default volumes: `ai-skills-provider` (mounted at `~/.claude/skills`) and `ai-instructions-provider` (at `/opt/ai-instructions`), both read-only. Each developer binds them on their own machine to a local folder (`docker volume create --driver local --opt type=none --opt o=bind --opt device=<folder> <name>`), for example a folder in a notes vault. So no personal path, name or file ever ends up in the repo or an image, and the agent can't modify them. The agent can read them, though, and the network is open: mount a dedicated folder, not a whole vault.

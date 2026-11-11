@@ -9,7 +9,7 @@ This skeleton is set up so an agent works efficiently (few tokens) and the codeb
 `task check` is the single "am I done?" command for agents. It formats the code instead of only checking it, so an agent never spends a round trip on formatting (CI still rejects unformatted code). It runs in one container with quiet output, so a passing run costs a handful of lines while compiler errors stay complete (Rust's detailed errors are exactly what lets an agent fix its own mistakes).
 
 ## 3. Structure That Fits Agents
-* **Guardrails as lints, not prose:** `unwrap()`/`expect()` outside tests and `#[allow]` without a reason fail the build (`Cargo.toml`, `clippy.toml`). The compiler enforces them every time, at zero token cost.
+* **Guardrails as lints, not prose:** `unwrap()`/`expect()` outside tests and `#[allow]` without a reason are lint warnings (`Cargo.toml`, `clippy.toml`) that fail `task check` and CI, which treat warnings as errors. The compiler enforces them every time, at zero token cost.
 * **Logic in `lib.rs`, thin `main.rs`:** the logic stays testable and the entry point stays trivial.
 * **Small modules:** an agent reading one 200-line file is far cheaper than reading one 2,000-line file.
 * **Workspace when it grows:** split subsystems into crates under `crates/` so a task only requires understanding one crate. Don't start with a workspace; it is bloat for a small project.

@@ -2,10 +2,9 @@
 
 # Sandbox for Claude Code (`task agent`); a dev tool, not part of the app.
 # Deliberately not pinned: `task agent:update` rebuilds it with the latest Claude Code and Node.js LTS.
-# Base image providing the full Rust toolchain on Debian Trixie
 FROM rust:1-trixie
 
-# Install Node.js (latest LTS release) and required utilities for Claude Code
+# Install Node.js (latest LTS) via NodeSource; curl and gnupg are needed for its setup script
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
@@ -13,7 +12,6 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Globally install the latest version of the official Anthropic Claude Code CLI package
 RUN npm install -g @anthropic-ai/claude-code
 
 # The sandbox has no Docker, so `task` (as used in AGENTS.md and .claude/settings.json)
@@ -30,7 +28,7 @@ case "$cmd" in
   run) exec cargo run -- "$@" ;;
   test) exec cargo test ;;
   fmt) exec cargo fmt --all ;;
-  *) echo "task '$cmd' is not available in the agent sandbox (check, cargo, run, test, fmt are)" >&2; exit 1 ;;
+  *) echo "task '$cmd' is not available in the agent sandbox (available: check, cargo, run, test, fmt)" >&2; exit 1 ;;
 esac
 EOF
 
@@ -42,6 +40,4 @@ RUN useradd --create-home --uid 1000 agent \
     && git config --system --add safe.directory /app
 USER agent
 ENV CLAUDE_CONFIG_DIR=/home/agent/.claude
-
-# Set the working directory inside the container for agent operations
 WORKDIR /app
