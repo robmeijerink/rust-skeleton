@@ -8,6 +8,8 @@ includes:
 vars:
   COMPOSE: docker compose -f .devcontainer/docker-compose.yml
   CARGO: "{{.COMPOSE}} run --rm app cargo"
+  # Adds the per-start generated masks for secret files (see agent:masks)
+  AGENT: "{{.COMPOSE}} -f .devcontainer/.agent-masks.yml"
 
 # Unique Compose project per checkout (matches the name VS Code Dev Containers uses)
 env:
@@ -61,6 +63,49 @@ tasks:
   # ==========================================
   # 🚀 MAIN
   # ==========================================
+  agent:masks:
+    desc: Mask every .env-style file in the project from the agent
+    internal: true
+    silent: true
+    # A bind mount can't use a glob, so list the files that exist now. Only existing files get a mask:
+    # mounting over a missing file would make Docker create an empty one in the project. A secret file
+    # created while the sandbox runs is masked after the next `task agent`. .env.example stays readable.
+    cmds:
+      - |
+        files=$(find . \( -path ./target -o -path ./.git -o -path ./node_modules \) -prune -o -type f \
+          \( -name '*.env' -o -name '.env.*' \) ! -name '.env.example' -print)
+        if [ -z "$files" ]; then
+          echo 'services: {}' > .devcontainer/.agent-masks.yml
+        else
+          { echo 'services:'; echo '  agent:'; echo '    volumes:'
+            for f in $files; do echo "      - /dev/null:/app/${f#./}:ro"; done
+          } > .devcontainer/.agent-masks.yml
+        fi
+
+  agent:prepare:
+    desc: Create what the sandbox mounts if it doesn't exist yet
+    internal: true
+    silent: true
+    cmds:
+      # Mounted read-only, so it must exist as a file (Docker would create a directory); a bare version line is a valid Taskfile
+      - '[ -e Taskfile.local.yml ] || printf "version: \"3\"\\n" > Taskfile.local.yml'
+      - docker volume create ai-skills-provider > /dev/null
+      - docker volume create ai-instructions-provider > /dev/null
+
+  agent:
+    desc: Start Claude Code in the sandbox (task agent -- <claude args>)
+    deps: [agent:prepare, agent:masks]
+    cmds:
+      - "{{.AGENT}} up -d --build agent"
+      - "{{.AGENT}} exec agent claude {{.CLI_ARGS}}"
+
+  agent:update:
+    desc: Rebuild the sandbox with the latest Claude Code and Node.js
+    deps: [agent:prepare, agent:masks]
+    cmds:
+      - "{{.AGENT}} build --pull --no-cache agent"
+      - "{{.AGENT}} up -d --force-recreate agent"
+
   dev:
     desc: Start the app and restart on file changes (via Docker Compose)
     deps: [volumes]
@@ -110,4 +155,4 @@ tasks:
     deps: [volumes]
     cmds:
       - "{{.CARGO}} clean"
-      - "{{.COMPOSE}} down"
+      - "{{.COMPOSE}} --profile agent down"

@@ -18,9 +18,50 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
 
+  # Sandbox for Claude Code (`task agent`): sees only this project, see docs/decisions/002-agent-sandbox.md
+  agent:
+    build:
+      context: ..
+      dockerfile: Dockerfile.dev-agent
+    # Only started by name (`task agent`), not by `task dev` or a plain `compose up`
+    profiles: [agent]
+    working_dir: /app
+    init: true
+    command: sleep infinity
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    volumes:
+      - ../:/app
+      # Read-only: whatever the agent writes here would run on the host (git hooks, task, compose,
+      # Claude Code hooks in .claude/)
+      # or let it commit. `git status` and `git diff` still work.
+      - ../.git:/app/.git:ro
+      - ../Taskfile.yaml:/app/Taskfile.yaml:ro
+      - ../.devcontainer:/app/.devcontainer:ro
+      - ../.claude:/app/.claude:ro
+      - ../Taskfile.local.yml:/app/Taskfile.local.yml:ro
+      # Secret files (.env, .env.*, *.env) are masked by `task agent`, which generates an extra compose file
+      # Own volumes (not the shared rust_* ones): the agent can't tamper with other projects' toolchain
+      - agent_cargo:/usr/local/cargo
+      - agent_rustup:/usr/local/rustup
+      - agent_target:/app/target
+      # Claude login: log in once with /login, it survives restarts and rebuilds
+      - agent_claude:/home/agent/.claude
+      # Optional personal skills (see README), read-only so the agent can't change them
+      - ai-skills-provider:/home/agent/.claude/skills:ro
+      # Optional personal instructions (see README), read-only as well
+      - ai-instructions-provider:/opt/ai-instructions:ro
+
   # Add local infrastructure (databases, queues, ...) here.
 
 volumes:
+  # Personal skills shared by all projects; created empty by `task agent`
+  ai-skills-provider:
+    external: true
+  # Personal instructions shared by all projects; created empty by `task agent`
+  ai-instructions-provider:
+    external: true
   # Created by `task` and the Dev Container's initializeCommand
   cargo:
     name: rust_cargo
@@ -29,3 +70,7 @@ volumes:
     name: rust_rustup
     external: true
   target:
+  agent_cargo:
+  agent_rustup:
+  agent_target:
+  agent_claude:

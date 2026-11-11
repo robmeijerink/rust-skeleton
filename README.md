@@ -73,6 +73,8 @@ Run `task` without any arguments to open the interactive `fzf` search menu, or r
 | `task check`          | Formats the code, then runs Clippy and tests (CI checks the same, without formatting). |
 | `task fmt`            | Formats the code. |
 | <code>task&nbsp;cargo&nbsp;&#8209;&#8209;&nbsp;&lt;cmd&gt;</code> | Runs any cargo command (e.g., `task cargo -- add serde --features derive`). |
+| `task agent`          | Starts Claude Code in the isolated sandbox (pass arguments with `task agent -- <args>`). |
+| `task agent:update`   | Rebuilds the sandbox with the latest Claude Code and Node.js. |
 | `task build`          | Builds the production Docker image, tagged with the directory name. |
 | `task clean`          | Removes build artifacts and shuts down containers. |
 
@@ -81,6 +83,36 @@ Add machine-specific tasks to a `Taskfile.local.yml`; it is included automatical
 ## Working with AI Agents
 
 The setup keeps agents efficient (few tokens) and the codebase manageable as it grows: a lean `AGENTS.md`, a quiet `task check` feedback loop, guardrails enforced by lints, and shared permissions. The full rationale, and how to keep it that way, is in [`docs/decisions/001-agentic-development-setup.md`](docs/decisions/001-agentic-development-setup.md). Keep that file when you rewrite this README.
+
+### Isolated Agent Sandbox
+
+`task agent` runs Claude Code in a container that only sees this project (not your home directory, other projects or secrets), so you can safely let it work in auto mode. `.git`, `.claude/` and the Task/Compose files are read-only: the agent can't commit or push (`git status` and `git diff` work) and can't plant anything that would run on your machine, you review and commit yourself. Because `.claude/` is read-only, "always allow" choices can't be saved there; add them yourself. Inside the sandbox `task check` runs the same cargo commands directly. What it does and doesn't protect against is in [`docs/decisions/002-agent-sandbox.md`](docs/decisions/002-agent-sandbox.md); notably, internet access is open.
+
+* **First run:** log in once with `/login` (Claude Pro/Max). The login is kept in a Docker volume and survives restarts and rebuilds.
+* **Updates:** the image uses the latest Claude Code and Node.js LTS when it is built. Run `task agent:update` when Claude Code reports it is outdated.
+* **Personal skills and instructions (optional):** two generic Docker volumes let you plug in your own material without it ever appearing in this repo. Both are shared by all projects, mounted read-only, and created empty by `task agent` if you don't use them.
+
+  | Volume | Mounted at | For |
+  | :--- | :--- | :--- |
+  | `ai-skills-provider` | `~/.claude/skills` | Claude skills (a folder per skill with a `SKILL.md`), picked up automatically. |
+  | `ai-instructions-provider` | `/opt/ai-instructions` | Personal rules and notes (Markdown), e.g. coding preferences. |
+
+  Create each volume once on your machine and point it at a folder of your choice (the folder must exist, and under Colima it must be inside your home directory):
+
+  ```sh
+  docker volume create --driver local --opt type=none --opt o=bind \
+    --opt device="$HOME/path/to/your/skills" ai-skills-provider
+  docker volume create --driver local --opt type=none --opt o=bind \
+    --opt device="$HOME/path/to/your/instructions" ai-instructions-provider
+  ```
+
+  This can be a folder in your notes app (e.g. Obsidian), so you keep editing it there. Use a dedicated folder, not your whole vault: the agent can read everything you mount and, with the open network, send it out (see the ADR). Changes to the files show up in the sandbox immediately. To change where a volume points, `docker volume rm` it and create it again.
+
+  Instructions aren't loaded automatically. Put a `CLAUDE.md` in your instructions folder that `@`-imports the other files. Then, once, in the sandbox (in Claude Code, start with `!` to run a shell command), run the line below. It is remembered in the login volume:
+
+  ```sh
+  echo "@/opt/ai-instructions/CLAUDE.md" > ~/.claude/CLAUDE.md
+  ```
 
 ## Upgrading Rust
 
@@ -95,12 +127,13 @@ Dependabot doesn't know the pinned version: if one of its PRs fails because a cr
 | `src/lib.rs`          | The application logic. |
 | `src/main.rs`         | The application entry point (calls `run` in `lib.rs`). |
 | `AGENTS.md`           | Instructions for AI agents (`CLAUDE.md` imports it). |
-| `docs/decisions/`     | Architecture decision records, starting with the agentic setup. |
+| `docs/decisions/`     | Architecture decision records (agentic setup, agent sandbox). |
 | `.claude/`            | Shared Claude Code permissions (allow `task`, ask before adding crates, block direct `cargo`). |
 | `clippy.toml`         | Allows `unwrap()`/`expect()` in tests only. |
 | `Cargo.toml`          | Package manifest, lint configuration and release profile. |
 | `rust-toolchain.toml` | Pins the exact Rust version and components. |
 | `Dockerfile`          | Multi-stage production image (distroless runtime). |
+| `Dockerfile.dev-agent`| Image of the Claude Code sandbox (`task agent`). |
 | `.devcontainer/`      | Dev Container config (`devcontainer.json`) and `docker-compose.yml` for local infrastructure. |
 | `.github/`            | CI workflow, Dependabot config and `CODEOWNERS`. |
 | `Taskfile.yaml`       | Task runner configuration. |

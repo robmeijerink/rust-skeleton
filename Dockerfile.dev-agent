@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1
+
+# Sandbox for Claude Code (`task agent`); a dev tool, not part of the app.
+# Deliberately not pinned: `task agent:update` rebuilds it with the latest Claude Code and Node.js LTS.
+# Base image providing the full Rust toolchain on Debian Trixie
+FROM rust:1-trixie
+
+# Install Node.js (latest LTS release) and required utilities for Claude Code
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Globally install the latest version of the official Anthropic Claude Code CLI package
+RUN npm install -g @anthropic-ai/claude-code
+
+# The sandbox has no Docker, so `task` (as used in AGENTS.md and .claude/settings.json)
+# runs the same cargo commands directly. Keep in sync with the tasks in Taskfile.yaml.
+COPY --chmod=755 <<'EOF' /usr/local/bin/task
+#!/bin/sh
+set -e
+cmd="$1"
+if [ $# -gt 0 ]; then shift; fi
+if [ "$1" = "--" ]; then shift; fi
+case "$cmd" in
+  check) cargo fmt --all && cargo clippy -q --locked --all-targets -- -D warnings && cargo test -q --locked ;;
+  cargo) exec cargo "$@" ;;
+  run) exec cargo run -- "$@" ;;
+  test) exec cargo test ;;
+  fmt) exec cargo fmt --all ;;
+  *) echo "task '$cmd' is not available in the agent sandbox (check, cargo, run, test, fmt are)" >&2; exit 1 ;;
+esac
+EOF
+
+# Run as a non-root user (Claude Code refuses auto-approve modes as root). The volumes mounted
+# at these paths (see docker-compose.yml) inherit this ownership when they are first created.
+RUN useradd --create-home --uid 1000 agent \
+    && mkdir -p /app/target /home/agent/.claude \
+    && chown -R agent:agent /app /home/agent /usr/local/cargo /usr/local/rustup \
+    && git config --system --add safe.directory /app
+USER agent
+ENV CLAUDE_CONFIG_DIR=/home/agent/.claude
+
+# Set the working directory inside the container for agent operations
+WORKDIR /app
