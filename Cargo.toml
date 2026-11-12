@@ -14,7 +14,13 @@ pedantic = { level = "warn", priority = -1 }
 # Guardrails for AI agents: enforced by the compiler instead of written instructions
 unwrap_used = "warn"
 expect_used = "warn"
+allow_attributes = "warn" # use #[expect(..., reason = "...")]: it fails once the lint no longer fires
 allow_attributes_without_reason = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+dbg_macro = "warn"
+indexing_slicing = "warn"
 
 [profile.release]
 lto = "thin"

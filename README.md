@@ -130,7 +130,7 @@ Dependabot doesn't know the pinned version: if one of its PRs fails because a cr
 | `AGENTS.md`           | Instructions for AI agents (`CLAUDE.md` imports it). |
 | `docs/decisions/`     | Architecture decision records (agentic setup, agent sandbox). |
 | `.claude/`            | Shared Claude Code permissions (allow `task`, ask before adding crates, block direct `cargo`). |
-| `clippy.toml`         | Allows `unwrap()`/`expect()` in tests only. |
+| `clippy.toml`         | Allows `unwrap()`, `expect()`, `panic!`, indexing and `dbg!` in tests only. |
 | `Cargo.toml`          | Package manifest, lint configuration and release profile. |
 | `rust-toolchain.toml` | Pins the exact Rust version and components. |
 | `Dockerfile`          | Multi-stage production image (distroless runtime). |
