@@ -1,34 +1,32 @@
 # syntax=docker/dockerfile:1
+# check=skip=InvalidDefaultArgInFrom
 
 # Sandbox for Claude Code (`task agent`); a dev tool, not part of the app.
+# Stack-agnostic: the base image and the directories the agent must own come from the build args in
+# .devcontainer/docker-compose.yml, and the `task` script is mounted from .devcontainer/agent-task.sh.
+# Works with Debian-based images (e.g. rust:1-trixie, golang:1-trixie, node:22-trixie, python:3-trixie, php:8.4-cli-trixie).
 # Deliberately not pinned: `task agent:update` rebuilds it with the latest Claude Code.
-FROM rust:1-trixie
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
 
-# The sandbox has no Docker, so `task` (as used in AGENTS.md and .claude/settings.json)
-# runs the same cargo commands directly. Keep in sync with the tasks in Taskfile.yaml.
-COPY --chmod=755 <<'EOF' /usr/local/bin/task
-#!/bin/sh
-set -e
-cmd="$1"
-if [ $# -gt 0 ]; then shift; fi
-if [ "$1" = "--" ]; then shift; fi
-case "$cmd" in
-  check) cargo fmt --all && cargo clippy -q --locked --all-targets -- -D warnings && cargo test -q --locked ;;
-  cargo) exec cargo "$@" ;;
-  run) exec cargo run -- "$@" ;;
-  test) exec cargo test ;;
-  fmt) exec cargo fmt --all ;;
-  *) echo "task '$cmd' is not available in the agent sandbox (available: check, cargo, run, test, fmt)" >&2; exit 1 ;;
-esac
-EOF
+# git for `git status`/`diff`/`log`, curl for the Claude Code installer; not every base image has them
+RUN if ! command -v git > /dev/null || ! command -v curl > /dev/null; then \
+      apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # Run as a non-root user (Claude Code refuses auto-approve modes as root). The volumes mounted
 # at these paths (see docker-compose.yml) inherit this ownership when they are first created.
 # UID is set by Taskfile.yaml (AGENT_UID): your own uid on Linux, so the agent can write to the project.
+# Some base images already have a user with this uid (e.g. `node` in node images); it is removed,
+# otherwise that user's name and home would be used instead of `agent`.
 ARG UID=1000
-RUN useradd --create-home --uid "$UID" agent \
-    && mkdir -p /app/target /home/agent/.claude \
-    && chown -R agent:agent /app /home/agent /usr/local/cargo /usr/local/rustup \
+ARG OWNED_DIRS=""
+RUN existing=$(getent passwd "$UID" | cut -d: -f1); \
+    if [ -n "$existing" ]; then userdel --remove "$existing" 2> /dev/null || userdel "$existing"; fi; \
+    useradd --create-home --uid "$UID" agent \
+    && mkdir -p /app /home/agent/.claude $OWNED_DIRS \
+    && chown -R agent:agent /app /home/agent $OWNED_DIRS \
     && git config --system --add safe.directory /app
 USER agent
 ENV CLAUDE_CONFIG_DIR=/home/agent/.claude

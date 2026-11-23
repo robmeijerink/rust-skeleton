@@ -25,6 +25,9 @@ services:
       dockerfile: Dockerfile.dev-agent
       args:
         UID: ${AGENT_UID:-1000}
+        # Stack-specific: the toolchain image, and the directories the agent must own (toolchain and build output)
+        BASE_IMAGE: rust:1-trixie
+        OWNED_DIRS: /usr/local/cargo /usr/local/rustup /app/target
     # Only started by name (`task agent`), not by `task dev` or a plain `compose up`
     profiles: [agent]
     working_dir: /app
@@ -46,6 +49,8 @@ services:
       - ../.devcontainer:/app/.devcontainer:ro
       - ../.claude:/app/.claude:ro
       - ../Taskfile.local.yml:/app/Taskfile.local.yml:ro
+      # `task` in the sandbox (no Docker there): runs the commands directly. Stack-specific, like Taskfile.yaml
+      - ./agent-task.sh:/usr/local/bin/task:ro
       # .secrets/ is hidden from the agent (empty and read-only), so it can't read what you keep there.
       # Opt-in: see "Secrets" in docs/decisions/002-agent-sandbox.md.
 

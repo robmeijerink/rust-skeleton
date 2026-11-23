@@ -136,7 +136,7 @@ Dependabot doesn't know the pinned version: if one of its PRs fails because a cr
 | `rust-toolchain.toml` | Pins the exact Rust version and components. |
 | `Dockerfile`          | Multi-stage production image (distroless runtime). |
 | `Dockerfile.dev-agent`| Image of the Claude Code sandbox (`task agent`). |
-| `.devcontainer/`      | Dev Container config (`devcontainer.json`) and `docker-compose.yml` for local infrastructure. |
+| `.devcontainer/`      | Dev Container config (`devcontainer.json`), `docker-compose.yml` for local infrastructure, and `agent-task.sh` (`task` inside the sandbox). |
 | `.github/`            | CI workflow, Dependabot config and `CODEOWNERS`. |
 | `Taskfile.yaml`       | Task runner configuration. |
 

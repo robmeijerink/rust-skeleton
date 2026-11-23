@@ -48,4 +48,19 @@ The repo only knows two generic, empty-by-default volumes: `ai-skills-provider` 
 The image is deliberately unpinned (latest Claude Code via the native installer; npm installs are deprecated): it is a dev tool, not part of the app. Its auto-updater is off, because an update inside the container would be lost when the container is recreated. Docker caches the layers, so run `task agent:update` to get the latest version. Your login survives.
 
 ## `task` Inside the Sandbox
-The sandbox has no Docker, so the image contains a small `task` script that runs the same cargo commands as `task check`, `run`, `test`, `fmt` and `cargo`. That keeps `AGENTS.md` and `.claude/settings.json` (which blocks direct `cargo`) valid in both places. Keep the script in `Dockerfile.dev-agent` in sync with `Taskfile.yaml`.
+The sandbox has no Docker, so `.devcontainer/agent-task.sh` is mounted read-only as `task`: it runs the same cargo commands as `task check`, `run`, `test`, `fmt` and `cargo`. That keeps `AGENTS.md` and `.claude/settings.json` (which blocks direct `cargo`) valid in both places. Keep it in sync with `Taskfile.yaml`; a change takes effect without a rebuild.
+
+## Other Stacks
+`Dockerfile.dev-agent` is stack-agnostic. To give a Go, TypeScript, Python or Laravel project the same sandbox, copy unchanged:
+* `Dockerfile.dev-agent`,
+* the `agent`, `agent:prepare` and `agent:update` tasks and the `AGENT_UID` variable in `Taskfile.yaml`,
+* the `agent` service in `docker-compose.yml` with its volumes (`agent_*`, `ai-skills-provider`, `ai-instructions-provider`),
+* the `.secrets/` lines in `.gitignore` and `.dockerignore`,
+* this record.
+
+Then change only:
+* the build args of the `agent` service: `BASE_IMAGE` (a Debian-based image, e.g. `golang:1-trixie`, `node:22-trixie`, `python:3-trixie` or `php:8.4-cli-trixie`; Alpine lacks `useradd` and `apt-get`) and `OWNED_DIRS` (toolchain and build directories that get their own volumes, e.g. `/go` for Go, `/app/node_modules`, `/app/.venv` or `/app/vendor`),
+* the `agent_*` volumes for those directories,
+* `.devcontainer/agent-task.sh`, to match that project's `Taskfile.yaml`, and the matching `deny` rules in `.claude/settings.json` (e.g. `npm`, `go` or `pip` instead of `cargo`),
+* if the project needs more than the official image (Composer and PHP extensions such as `pdo_pgsql`), point `BASE_IMAGE` at the project's own dev image, so the agent has the same toolchain as the `app` service,
+* the stack-specific examples in this record (e.g. `build.rs` becomes `postinstall`, Composer scripts or `conftest.py`).
