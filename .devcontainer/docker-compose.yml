@@ -36,6 +36,8 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     pids_limit: 512
+    # .secrets/ is hidden from the agent (empty and read-only), so it can't read what you keep there.
+    # Opt-in: see "Secrets" in docs/decisions/002-agent-sandbox.md.
     tmpfs:
       - /app/.secrets:ro,size=1m
     volumes:
@@ -51,9 +53,6 @@ services:
       - ../Taskfile.local.yml:/app/Taskfile.local.yml:ro
       # `task` in the sandbox (no Docker there): runs the commands directly. Stack-specific, like Taskfile.yaml
       - ./agent-task.sh:/usr/local/bin/task:ro
-      # .secrets/ is hidden from the agent (empty and read-only), so it can't read what you keep there.
-      # Opt-in: see "Secrets" in docs/decisions/002-agent-sandbox.md.
-
       # Separate volumes for cargo, rustup and target instead of the shared rust_* ones, so the agent
       # can't modify the toolchain and crate cache that your other projects use.
       - agent_cargo:/usr/local/cargo

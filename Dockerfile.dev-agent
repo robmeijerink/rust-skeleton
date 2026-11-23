@@ -8,6 +8,10 @@
 # Deliberately not pinned: `task agent:update` rebuilds it with the latest Claude Code.
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
+# A project's own dev image may switch to a non-root user or start a server in its entrypoint;
+# this image needs root to set up, and runs `sleep infinity` from docker-compose.yml.
+USER root
+ENTRYPOINT []
 
 # git for `git status`/`diff`/`log`, curl for the Claude Code installer; not every base image has them
 RUN if ! command -v git > /dev/null || ! command -v curl > /dev/null; then \

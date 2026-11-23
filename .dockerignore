@@ -25,6 +25,9 @@ target/
 README.md
 docs/
 
+# Machine-specific tasks
+Taskfile.local.yml
+
 # AI agent config
 .claude/
 AGENTS.md
