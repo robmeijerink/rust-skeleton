@@ -86,7 +86,7 @@ The setup keeps agents efficient (few tokens) and the codebase manageable as it 
 
 ### Isolated Agent Sandbox
 
-`task agent` runs Claude Code in a container that only sees this project (no home directory or other projects), so you can let it work in auto mode. It can't commit, push or change files that run on your machine; you review and commit yourself. Its code does run once you use `task` or open the project in an editor with rust-analyzer, so review the changes first. Internet access is open. What the sandbox does and doesn't protect against, plus a quick check before opening the project: [`docs/decisions/002-agent-sandbox.md`](docs/decisions/002-agent-sandbox.md).
+`task agent` runs Claude Code in a container that only sees this project (no home directory or other projects), so you can let it work in auto mode. It can't commit, push or change the git hooks, Taskfiles, Compose files and Claude Code settings; you review and commit yourself. Its changes do run on your machine once you use `task`, open the project in an editor or commit (e.g. via a git hook manager), so review the diff first. Internet access is open. What the sandbox does and doesn't protect against, plus a quick check before opening the project: [`docs/decisions/002-agent-sandbox.md`](docs/decisions/002-agent-sandbox.md).
 
 * **First run:** log in once with `/login` (Claude Pro/Max). The login is kept in a Docker volume and survives restarts and rebuilds.
 * **Updates:** the image gets the latest Claude Code when it is built and doesn't update itself. Run `task agent:update` now and then to get the latest version.

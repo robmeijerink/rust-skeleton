@@ -5,7 +5,7 @@
 ## What the Sandbox Guarantees
 * **Only the project is mounted.** No home directory, no Docker socket, no host `~/.claude`.
 * **Secrets in `.secrets/` stay out (opt-in).** It is an empty, read-only `tmpfs` in the sandbox. Everything else is readable, including a `.env` in the project root. See [Secrets](#secrets).
-* **The agent can't plant files that the host runs.** `.git`, `Taskfile.yaml`, `Taskfile.local.yml`, `.devcontainer/` and `.claude/` are read-only, so no git hook, task, compose change or Claude Code hook can take effect on the host. As a side effect the agent can't commit; `git status`, `git diff` and `git log` still work. You review and commit yourself.
+* **Git, Task, Compose and Claude Code config are read-only.** `.git`, `Taskfile.yaml`, `Taskfile.local.yml`, `.devcontainer/` and `.claude/` are mounted read-only, so the agent can't plant a git hook, task, compose change or Claude Code hook that takes effect on the host. Other project files that the host runs are writable; see below. As a side effect the agent can't commit; `git status`, `git diff` and `git log` still work. You review and commit yourself.
 * **Own volumes** (`agent_cargo`, `agent_rustup`, `agent_target`, `agent_claude`), not the `rust_*` ones the app uses, so the agent can't plant a binary in a toolchain shared with other projects.
 * **Hardened container:** non-root user (on Linux with your own uid, so it can write to the project), all capabilities dropped, `no-new-privileges`, a process limit.
 * **No credentials for git remotes**, so the agent can't push.
