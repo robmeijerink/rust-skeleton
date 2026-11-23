@@ -8,8 +8,6 @@ includes:
 vars:
   COMPOSE: docker compose -f .devcontainer/docker-compose.yml
   CARGO: "{{.COMPOSE}} run --rm app cargo"
-  # Adds the secret-file masks that agent:masks generates on every start
-  AGENT: "{{.COMPOSE}} -f .devcontainer/.agent-masks.yml"
 
 # Unique Compose project per checkout (matches the name VS Code Dev Containers uses)
 env:
@@ -70,26 +68,6 @@ tasks:
   # ==========================================
   # 🚀 MAIN
   # ==========================================
-  agent:masks:
-    desc: Hide every .env-style file in the project from the agent
-    internal: true
-    silent: true
-    # A bind mount can't use a glob, so list the files that exist now. Only existing files get a mask:
-    # mounting over a missing file would make Docker create an empty one in the project. A secret file
-    # created while the sandbox runs is masked after the next `task agent`. .env.example stays readable.
-    cmds:
-      - |
-        files=$(find . \( -path ./target -o -path ./.git -o -path ./node_modules \) -prune -o -type f \
-          \( -name '*.env' -o -name '.env.*' \) ! -name '.env.example' -print)
-        if [ -z "$files" ]; then
-          echo 'services: {}' > .devcontainer/.agent-masks.yml
-        else
-          # One path per line (not word-split), quoted in the YAML, so names with spaces work too
-          { echo 'services:'; echo '  agent:'; echo '    volumes:'
-            echo "$files" | while IFS= read -r f; do echo "      - \"/dev/null:/app/${f#./}:ro\""; done
-          } > .devcontainer/.agent-masks.yml
-        fi
-
   agent:prepare:
     desc: Create what the sandbox mounts if it doesn't exist yet
     internal: true
@@ -99,20 +77,33 @@ tasks:
       - '[ -e Taskfile.local.yml ] || printf "version: \"3\"\\n" > Taskfile.local.yml'
       - docker volume create ai-skills-provider > /dev/null
       - docker volume create ai-instructions-provider > /dev/null
+      # Only if you opted in to .secrets/ (it has files; the empty folder is created by the sandbox's mount):
+      # warn about .env files the agent can still read. A hint, not a guarantee (see "Secrets" in
+      # docs/decisions/002-agent-sandbox.md). -type f skips the symlinks; files tracked by git
+      # (.env.example, a committed .env.testing) are not secret, so they are skipped.
+      - |
+        [ -n "$(ls -A .secrets 2> /dev/null)" ] || exit 0
+        files=$(find . \( -path ./target -o -path ./.git -o -path ./node_modules -o -path ./vendor -o -path ./.secrets \) -prune \
+          -o -type f \( -name '.env' -o -name '.env.*' -o -name '*.env' \) -print \
+          | while IFS= read -r f; do git ls-files --error-unmatch -- "$f" > /dev/null 2>&1 || echo "$f"; done)
+        if [ -n "$files" ]; then
+          echo "Warning: the agent can read these .env files (not symlinked into .secrets/):" >&2
+          echo "$files" | sed 's|^\./|  |' >&2
+        fi
 
   agent:
     desc: Start Claude Code in the sandbox (task agent -- <claude args>)
-    deps: [agent:prepare, agent:masks]
+    deps: [agent:prepare]
     cmds:
-      - "{{.AGENT}} up -d --build agent"
-      - "{{.AGENT}} exec agent claude {{.CLI_ARGS}}"
+      - "{{.COMPOSE}} up -d --build agent"
+      - "{{.COMPOSE}} exec agent claude {{.CLI_ARGS}}"
 
   agent:update:
     desc: Rebuild the sandbox with the latest Claude Code
-    deps: [agent:prepare, agent:masks]
+    deps: [agent:prepare]
     cmds:
-      - "{{.AGENT}} build --pull --no-cache agent"
-      - "{{.AGENT}} up -d --force-recreate agent"
+      - "{{.COMPOSE}} build --pull --no-cache agent"
+      - "{{.COMPOSE}} up -d --force-recreate agent"
 
   dev:
     desc: Start the app and restart on file changes (via Docker Compose)

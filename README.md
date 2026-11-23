@@ -86,10 +86,11 @@ The setup keeps agents efficient (few tokens) and the codebase manageable as it 
 
 ### Isolated Agent Sandbox
 
-`task agent` runs Claude Code in a container that only sees this project (no home directory, other projects or secrets), so you can let it work in auto mode. It can't commit, push or change files that run on your machine; you review and commit yourself. Its code does run once you use `task` or open the project in an editor with rust-analyzer, so review the changes first. Internet access is open. What the sandbox does and doesn't protect against, plus a quick check before opening the project: [`docs/decisions/002-agent-sandbox.md`](docs/decisions/002-agent-sandbox.md).
+`task agent` runs Claude Code in a container that only sees this project (no home directory or other projects), so you can let it work in auto mode. It can't commit, push or change files that run on your machine; you review and commit yourself. Its code does run once you use `task` or open the project in an editor with rust-analyzer, so review the changes first. Internet access is open. What the sandbox does and doesn't protect against, plus a quick check before opening the project: [`docs/decisions/002-agent-sandbox.md`](docs/decisions/002-agent-sandbox.md).
 
 * **First run:** log in once with `/login` (Claude Pro/Max). The login is kept in a Docker volume and survives restarts and rebuilds.
 * **Updates:** the image gets the latest Claude Code when it is built and doesn't update itself. Run `task agent:update` now and then to get the latest version.
+* **Secrets (optional):** by default the agent can read everything in the project, including `.env`. To hide secrets from it, keep them in `.secrets/` and symlink `.env` to it (`mkdir -p .secrets && mv .env .secrets/.env && ln -s .secrets/.env .env`); the sandbox sees an empty `.secrets/`, everything else sees the symlink resolve. Details in the ADR.
 * **Permissions:** `.claude/` is read-only in the sandbox, so "always allow" choices aren't saved; add them to `.claude/settings.json` yourself.
 * **Personal skills and instructions (optional):** two generic Docker volumes let you plug in your own material without it ever appearing in this repo. Both are shared by all projects, mounted read-only, and created empty by `task agent` if you don't use them.
 

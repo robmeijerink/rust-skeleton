@@ -33,6 +33,8 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     pids_limit: 512
+    tmpfs:
+      - /app/.secrets:ro,size=1m
     volumes:
       - ../:/app
       # The mounts below are read-only. Otherwise the agent could break out of the sandbox by editing
@@ -44,8 +46,8 @@ services:
       - ../.devcontainer:/app/.devcontainer:ro
       - ../.claude:/app/.claude:ro
       - ../Taskfile.local.yml:/app/Taskfile.local.yml:ro
-      # Secret files (.env, .env.*, *.env) are not visible to the agent: `task agent` generates an
-      # extra compose file that masks them (not listed here).
+      # .secrets/ is hidden from the agent (empty and read-only), so it can't read what you keep there.
+      # Opt-in: see "Secrets" in docs/decisions/002-agent-sandbox.md.
 
       # Separate volumes for cargo, rustup and target instead of the shared rust_* ones, so the agent
       # can't modify the toolchain and crate cache that your other projects use.
